@@ -6,94 +6,17 @@ local player = Players.LocalPlayer
 local char = player.Character or player.CharacterAdded:Wait()
 local root = char:WaitForChild("RootPart")
 
--- ======= King of The Hill =======
-local teleportPos = Vector3.new(10.26, 180.83, -172.44)
-local teleportDuration = 150 -- secondes (2min30)
-local teleportInterval = 0.1 -- fréquence de téléport en secondes
+-- ====== Boost de vitesse ======
 
-local teleporting = false
-local elapsed = 0
-local lastTeleportTime = 0
-
--- ======= Boost de vitesse =======
 local boostEnabled = true
 local boostAmount = 1
 local lastPos = root.Position
 
--- === Création de l'UI ===
 local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
-gui.Name = "CombinedUI"
+gui.Name = "MainGui"
 gui.ResetOnSpawn = false
 
--- ===== King of The Hill UI =====
-local kothFrame = Instance.new("Frame", gui)
-kothFrame.Size = UDim2.new(0, 250, 0, 80)
-kothFrame.Position = UDim2.new(0, 10, 0, 150)
-kothFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-kothFrame.BorderSizePixel = 0
-Instance.new("UICorner", kothFrame).CornerRadius = UDim.new(0, 8)
-
-local kothTitle = Instance.new("TextLabel", kothFrame)
-kothTitle.Size = UDim2.new(1, 0, 0, 30)
-kothTitle.Position = UDim2.new(0, 0, 0, 0)
-kothTitle.Text = "King of The Hill"
-kothTitle.BackgroundTransparency = 1
-kothTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-kothTitle.Font = Enum.Font.GothamBold
-kothTitle.TextScaled = true
-
-local statusLabel = Instance.new("TextLabel", kothFrame)
-statusLabel.Size = UDim2.new(1, 0, 0, 30)
-statusLabel.Position = UDim2.new(0, 0, 0, 35)
-statusLabel.Text = "Statut : En attente..."
-statusLabel.BackgroundTransparency = 1
-statusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-statusLabel.Font = Enum.Font.Gotham
-statusLabel.TextScaled = true
-
--- Variables drag King of the Hill UI
-local dragging = false
-local dragInput
-local dragStart
-local startPos
-
-local function updateInput(input)
-	local delta = input.Position - dragStart
-	kothFrame.Position = UDim2.new(
-		math.clamp(startPos.X.Scale, 0, 1),
-		math.clamp(startPos.X.Offset + delta.X, 0, workspace.CurrentCamera.ViewportSize.X - kothFrame.AbsoluteSize.X),
-		math.clamp(startPos.Y.Scale, 0, 1),
-		math.clamp(startPos.Y.Offset + delta.Y, 0, workspace.CurrentCamera.ViewportSize.Y - kothFrame.AbsoluteSize.Y)
-	)
-end
-
-kothFrame.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		dragging = true
-		dragStart = input.Position
-		startPos = kothFrame.Position
-
-		input.Changed:Connect(function()
-			if input.UserInputState == Enum.UserInputState.End then
-				dragging = false
-			end
-		end)
-	end
-end)
-
-kothFrame.InputChanged:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseMovement then
-		dragInput = input
-	end
-end)
-
-UserInputService.InputChanged:Connect(function(input)
-	if input == dragInput and dragging then
-		updateInput(input)
-	end
-end)
-
--- ===== Boost de vitesse UI =====
+-- Boost UI Frame
 local boostFrame = Instance.new("Frame", gui)
 boostFrame.Size = UDim2.new(0, 250, 0, 120)
 boostFrame.Position = UDim2.new(0, 10, 0, 10)
@@ -143,24 +66,24 @@ sliderValue.TextColor3 = Color3.fromRGB(255, 255, 255)
 sliderValue.Font = Enum.Font.Gotham
 sliderValue.TextScaled = true
 
--- Toggle bouton boost
+-- Toggle bouton
 toggle.MouseButton1Click:Connect(function()
 	boostEnabled = not boostEnabled
 	toggle.Text = boostEnabled and "Boost : ACTIVÉ ✅" or "Boost : DÉSACTIVÉ ❌"
 	toggle.BackgroundColor3 = boostEnabled and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(200, 0, 0)
 end)
 
--- Slider gestion boost
-local sliderDragging = false
+-- Slider gestion
+local draggingSlider = false
 sliderBack.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then sliderDragging = true end
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then draggingSlider = true end
 end)
 sliderBack.InputEnded:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then sliderDragging = false end
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then draggingSlider = false end
 end)
 
 UserInputService.InputChanged:Connect(function(input)
-	if sliderDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+	if draggingSlider and input.UserInputType == Enum.UserInputType.MouseMovement then
 		local relX = math.clamp((input.Position.X - sliderBack.AbsolutePosition.X) / sliderBack.AbsoluteSize.X, 0, 1)
 		sliderFill.Size = UDim2.new(relX, 0, 1, 0)
 		boostAmount = math.floor((relX * 10) * 10) / 10
@@ -168,14 +91,116 @@ UserInputService.InputChanged:Connect(function(input)
 	end
 end)
 
--- Reconnect root sur respawn
+-- Gérer le respawn du joueur
+player.CharacterAdded:Connect(function(newChar)
+	char = newChar
+	root = newChar:WaitForChild("RootPart")
+	lastPos = root.Position
+end)
+
+-- Boucle principale boost
+RunService.RenderStepped:Connect(function()
+	if not boostEnabled then return end
+	if not root or not root.Parent then return end
+
+	local currentPos = root.Position
+	local moveDir = Vector3.new(currentPos.X - lastPos.X, 0, currentPos.Z - lastPos.Z)
+
+	if moveDir.Magnitude > 0.1 then
+		local boost = moveDir.Unit * boostAmount
+		root.CFrame = root.CFrame + Vector3.new(boost.X, 0, boost.Z)
+	end
+
+	lastPos = currentPos
+end)
+
+-- Drag Boost UI
+local boostDragging = false
+local boostDragInput
+local boostDragStart
+local boostStartPos
+
+local function updateBoostInput(input)
+	local delta = input.Position - boostDragStart
+	boostFrame.Position = UDim2.new(
+		math.clamp(boostStartPos.X.Scale, 0, 1),
+		math.clamp(boostStartPos.X.Offset + delta.X, 0, workspace.CurrentCamera.ViewportSize.X - boostFrame.AbsoluteSize.X),
+		math.clamp(boostStartPos.Y.Scale, 0, 1),
+		math.clamp(boostStartPos.Y.Offset + delta.Y, 0, workspace.CurrentCamera.ViewportSize.Y - boostFrame.AbsoluteSize.Y)
+	)
+end
+
+boostFrame.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		boostDragging = true
+		boostDragStart = input.Position
+		boostStartPos = boostFrame.Position
+
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				boostDragging = false
+			end
+		end)
+	end
+end)
+
+boostFrame.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement then
+		boostDragInput = input
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+	if input == boostDragInput and boostDragging then
+		updateBoostInput(input)
+	end
+end)
+
+
+-- ====== King of The Hill ======
+
+local teleportPos = Vector3.new(10.26, 180.83, -172.44)
+local teleportDuration = 150 -- secondes (2min30)
+local teleportInterval = 0.1 -- fréquence de téléport en secondes
+
+-- KoTH UI Frame
+local kothFrame = Instance.new("Frame", gui)
+kothFrame.Size = UDim2.new(0, 250, 0, 80)
+kothFrame.Position = UDim2.new(0, 10, 0, 150)
+kothFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+kothFrame.BorderSizePixel = 0
+Instance.new("UICorner", kothFrame).CornerRadius = UDim.new(0, 8)
+
+local kothTitle = Instance.new("TextLabel", kothFrame)
+kothTitle.Size = UDim2.new(1, 0, 0, 30)
+kothTitle.Position = UDim2.new(0, 0, 0, 0)
+kothTitle.Text = "King of The Hill"
+kothTitle.BackgroundTransparency = 1
+kothTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+kothTitle.Font = Enum.Font.GothamBold
+kothTitle.TextScaled = true
+
+local statusLabel = Instance.new("TextLabel", kothFrame)
+statusLabel.Size = UDim2.new(1, 0, 0, 30)
+statusLabel.Position = UDim2.new(0, 0, 0, 35)
+statusLabel.Text = "Statut : En attente..."
+statusLabel.BackgroundTransparency = 1
+statusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+statusLabel.Font = Enum.Font.Gotham
+statusLabel.TextScaled = true
+
+local teleporting = false
+local elapsed = 0
+local lastTeleportTime = 0
+
+-- Reconnect root sur respawn (KoTH)
 player.CharacterAdded:Connect(function(newChar)
 	char = newChar
 	root = char:WaitForChild("RootPart")
 	lastPos = root.Position
 end)
 
--- Fonction téléportation King of the Hill
+-- Fonction pour téléporter (KoTH)
 local function teleportLoop(dt)
 	if teleporting then
 		if tick() - lastTeleportTime >= teleportInterval then
@@ -194,50 +219,4 @@ local function teleportLoop(dt)
 	end
 end
 
--- Compte à rebours avant l'event
-local function updateCountdown()
-	while true do
-		if not teleporting then
-			local now = os.date("*t")
-			local secondsLeft = (59 - now.min) * 60 + (60 - now.sec)
-			local minutes = math.floor(secondsLeft / 60)
-			local seconds = secondsLeft % 60
-			statusLabel.Text = string.format("Événement dans %02d min %02d s", minutes, seconds)
-		end
-		wait(1)
-	end
-end
-
--- Check toutes les secondes si on est à l'heure pile pour lancer la téléportation
-local function checkTime()
-	while true do
-		local now = os.date("*t")
-		if now.min == 0 and now.sec == 0 and not teleporting then
-			teleporting = true
-			elapsed = 0
-			statusLabel.Text = "Statut : Téléportation... 150.0 s restantes"
-		end
-		wait(1)
-	end
-end
-
--- Boucle principale boost de vitesse
-RunService.RenderStepped:Connect(function()
-	if not boostEnabled then return end
-	if not root or not root.Parent then return end
-
-	local currentPos = root.Position
-	local moveDir = Vector3.new(currentPos.X - lastPos.X, 0, currentPos.Z - lastPos.Z)
-
-	if moveDir.Magnitude > 0.1 then
-		local boost = moveDir.Unit * boostAmount
-		root.CFrame = root.CFrame + Vector3.new(boost.X, 0, boost.Z)
-	end
-
-	lastPos = currentPos
-end)
-
--- Lancement des boucles King of the Hill
-spawn(checkTime)
-spawn(updateCountdown)
-RunService.Heartbeat:Connect(teleportLoop)
+-- Temps
