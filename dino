@@ -1,0 +1,113 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+local char = player.Character or player.CharacterAdded:Wait()
+local root = char:WaitForChild("RootPart")
+
+local boostEnabled = true
+local boostAmount = 1
+local lastPos = root.Position
+
+-- UI
+local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+gui.Name = "BoostUI"
+gui.ResetOnSpawn = false
+
+local mainFrame = Instance.new("Frame", gui)
+mainFrame.Size = UDim2.new(0, 250, 0, 120)
+mainFrame.Position = UDim2.new(0, 10, 0, 10)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+mainFrame.BorderSizePixel = 0
+mainFrame.BackgroundTransparency = 0.1
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 8)
+
+local title = Instance.new("TextLabel", mainFrame)
+title.Size = UDim2.new(1, 0, 0, 30)
+title.Position = UDim2.new(0, 0, 0, 0)
+title.Text = "Boost de Vitesse"
+title.BackgroundTransparency = 1
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.Font = Enum.Font.GothamBold
+title.TextScaled = true
+
+local toggle = Instance.new("TextButton", mainFrame)
+toggle.Size = UDim2.new(0, 230, 0, 30)
+toggle.Position = UDim2.new(0, 10, 0, 35)
+toggle.Text = "Boost : ACTIVÉ ✅"
+toggle.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+toggle.TextColor3 = Color3.new(1, 1, 1)
+toggle.Font = Enum.Font.Gotham
+toggle.TextScaled = true
+Instance.new("UICorner", toggle).CornerRadius = UDim.new(0, 6)
+
+local sliderBack = Instance.new("Frame", mainFrame)
+sliderBack.Size = UDim2.new(0, 230, 0, 10)
+sliderBack.Position = UDim2.new(0, 10, 0, 80)
+sliderBack.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+sliderBack.BorderSizePixel = 0
+Instance.new("UICorner", sliderBack).CornerRadius = UDim.new(0, 4)
+
+local sliderFill = Instance.new("Frame", sliderBack)
+sliderFill.Size = UDim2.new(boostAmount / 10, 0, 1, 0)
+sliderFill.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+sliderFill.BorderSizePixel = 0
+Instance.new("UICorner", sliderFill).CornerRadius = UDim.new(0, 4)
+
+local sliderValue = Instance.new("TextLabel", mainFrame)
+sliderValue.Size = UDim2.new(1, 0, 0, 20)
+sliderValue.Position = UDim2.new(0, 0, 0, 95)
+sliderValue.BackgroundTransparency = 1
+sliderValue.Text = "Vitesse : " .. tostring(boostAmount)
+sliderValue.TextColor3 = Color3.fromRGB(255, 255, 255)
+sliderValue.Font = Enum.Font.Gotham
+sliderValue.TextScaled = true
+
+-- Toggle bouton
+toggle.MouseButton1Click:Connect(function()
+	boostEnabled = not boostEnabled
+	toggle.Text = boostEnabled and "Boost : ACTIVÉ ✅" or "Boost : DÉSACTIVÉ ❌"
+	toggle.BackgroundColor3 = boostEnabled and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(200, 0, 0)
+end)
+
+-- Slider gestion
+local dragging = false
+sliderBack.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true end
+end)
+sliderBack.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+	if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+		local relX = math.clamp((input.Position.X - sliderBack.AbsolutePosition.X) / sliderBack.AbsoluteSize.X, 0, 1)
+		sliderFill.Size = UDim2.new(relX, 0, 1, 0)
+		boostAmount = math.floor((relX * 10) * 10) / 10
+		sliderValue.Text = "Vitesse : " .. tostring(boostAmount)
+	end
+end)
+
+-- Gérer le respawn du joueur
+player.CharacterAdded:Connect(function(newChar)
+	char = newChar
+	root = newChar:WaitForChild("RootPart")
+	lastPos = root.Position
+end)
+
+-- Boucle principale
+RunService.RenderStepped:Connect(function()
+	if not boostEnabled then return end
+	if not root or not root.Parent then return end
+
+	local currentPos = root.Position
+	local moveDir = Vector3.new(currentPos.X - lastPos.X, 0, currentPos.Z - lastPos.Z)
+
+	if moveDir.Magnitude > 0.1 then
+		local boost = moveDir.Unit * boostAmount
+		root.CFrame = root.CFrame + Vector3.new(boost.X, 0, boost.Z)
+	end
+
+	lastPos = currentPos
+end)
